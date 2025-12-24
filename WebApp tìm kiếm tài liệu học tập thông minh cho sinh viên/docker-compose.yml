@@ -1,0 +1,101 @@
+version: "3.9"
+
+services:
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: abc123
+      MYSQL_DATABASE: duong
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: 12345
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    networks:
+      - my-app-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+    environment:
+      PMA_HOST: mariadb
+      MYSQL_ROOT_PASSWORD: abc123
+    ports:
+      - "8080:80"
+    networks:
+      - my-app-network
+
+  nodered_service:
+    image: nodered/node-red:latest
+    container_name: nodered_service
+    restart: unless-stopped
+    ports:
+      - "1880:1880"
+    volumes:
+      - nodered-data:/data
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+    networks:
+      - my-app-network
+
+  influxdb_service:
+    image: influxdb:latest
+    container_name: influxdb_service
+    restart: unless-stopped
+    ports:
+      - "8087:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    networks:
+      - my-app-network
+
+  grafana_service:
+    image: grafana/grafana:latest
+    container_name: grafana_service
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      # Tạm tắt dòng này để bạn có thể vào thẳng localhost:3001 mà không bị lỗi
+      # GF_SERVER_ROOT_URL: http://localhost:8081/grafana
+      # GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_SECURITY_ADMIN_PASSWORD: "admin" # Đặt pass mặc định là admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - influxdb_service
+    networks:
+      - my-app-network
+
+  nginx_service:
+    image: nginx:latest
+    container_name: nginx_service
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+      - "8443:443"
+    # Tạm tắt volumes để Nginx chạy trang mặc định, không bị lỗi thiếu file config
+    volumes:
+       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+       - ./nginx/html:/usr/share/nginx/html:ro
+    depends_on:
+      - nodered_service
+      - grafana_service
+    networks:
+      - my-app-network
+
+volumes:
+  mariadb-data:
+  nodered-data:
+  influxdb-data:
+  grafana-data:
+
+networks:
+  my-app-network:
+    driver: bridge
